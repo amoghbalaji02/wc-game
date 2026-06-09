@@ -62,23 +62,21 @@ app.get('/api/odds', async (req, res) => {
 // ── Predictions ────────────────────────────────────────────────────────────
 
 app.post('/api/predictions', (req, res) => {
-  const { user_id, match_id, home_goals, away_goals, over_under } = req.body;
-  if (user_id == null || !match_id || home_goals == null || away_goals == null || !over_under) {
+  const { user_id, match_id, home_goals, away_goals } = req.body;
+  if (user_id == null || !match_id || home_goals == null || away_goals == null) {
     return res.status(400).json({ error: 'Missing fields' });
   }
-  if (!['over', 'under'].includes(over_under)) return res.status(400).json({ error: 'over_under must be over or under' });
   if (home_goals < 0 || away_goals < 0 || home_goals > 20 || away_goals > 20) {
     return res.status(400).json({ error: 'Invalid goal values' });
   }
   db.prepare(`
-    INSERT INTO predictions (user_id, match_id, home_goals, away_goals, over_under)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO predictions (user_id, match_id, home_goals, away_goals)
+    VALUES (?, ?, ?, ?)
     ON CONFLICT(user_id, match_id) DO UPDATE SET
       home_goals = excluded.home_goals,
       away_goals = excluded.away_goals,
-      over_under = excluded.over_under,
       updated_at = CURRENT_TIMESTAMP
-  `).run(user_id, match_id, home_goals, away_goals, over_under);
+  `).run(user_id, match_id, home_goals, away_goals);
   res.json({ ok: true });
 });
 
@@ -100,7 +98,7 @@ app.get('/api/leaderboard/:room_code', async (req, res) => {
 
   const board = users.map(user => {
     const preds = db.prepare('SELECT * FROM predictions WHERE user_id = ?').all(user.id);
-    let total = 0, result = 0, exact = 0, ou = 0, scored = 0;
+    let total = 0, result = 0, exact = 0, scored = 0;
     for (const p of preds) {
       const match = matchMap[p.match_id];
       if (!match || match.homeScore === null) continue;
@@ -108,15 +106,12 @@ app.get('/api/leaderboard/:room_code', async (req, res) => {
       if (pts === null) continue;
       total += pts;
       scored++;
-      // breakdown
       const predResult = p.home_goals > p.away_goals ? 'H' : p.home_goals < p.away_goals ? 'A' : 'D';
       const actualResult = match.homeScore > match.awayScore ? 'H' : match.homeScore < match.awayScore ? 'A' : 'D';
       if (predResult === actualResult) result++;
       if (p.home_goals === match.homeScore && p.away_goals === match.awayScore) exact++;
-      const actualOU = (match.homeScore + match.awayScore) >= 3 ? 'over' : 'under';
-      if (p.over_under === actualOU) ou++;
     }
-    return { username: user.username, total, result, exact, ou, scored, predictions: preds.length };
+    return { username: user.username, total, result, exact, scored, predictions: preds.length };
   });
 
   board.sort((a, b) => b.total - a.total || b.exact - a.exact);

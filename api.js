@@ -82,10 +82,6 @@ function calcPoints(prediction, match) {
   if (predResult === actualResult) points++;
   if (prediction.home_goals === match.homeScore && prediction.away_goals === match.awayScore) points++;
 
-  const totalGoals = match.homeScore + match.awayScore;
-  const actualOU = totalGoals >= 3 ? 'over' : 'under';
-  if (prediction.over_under === actualOU) points++;
-
   return points;
 }
 

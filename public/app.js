@@ -247,11 +247,10 @@ function renderMatchCard(m) {
     const predResult = pred.home_goals > pred.away_goals ? 'H' : pred.home_goals < pred.away_goals ? 'A' : 'D';
     const actualResult = m.homeScore > m.awayScore ? 'H' : m.homeScore < m.awayScore ? 'A' : 'D';
     predResultHtml = `<div class="pred-result">
-      <span class="your-pred">You: ${pred.home_goals}–${pred.away_goals} ${pred.over_under==='over'?'⬆':'⬇'}</span>
+      <span class="your-pred">You predicted: ${pred.home_goals}–${pred.away_goals}</span>
       <span class="pt-chip ${predResult===actualResult?'hit':'miss'}">${predResult===actualResult?'✓':'✗'} Result</span>
-      <span class="pt-chip ${pred.home_goals===m.homeScore&&pred.away_goals===m.awayScore?'hit':'miss'}">${pred.home_goals===m.homeScore&&pred.away_goals===m.awayScore?'✓':'✗'} Exact</span>
-      <span class="pt-chip ${pred.over_under===actualOU?'hit':'miss'}">${pred.over_under===actualOU?'✓':'✗'} O/U</span>
-      <span class="pts-total" style="color:${pts===3?'var(--accent2)':pts>0?'var(--accent)':'var(--muted)'}">${pts} pt${pts!==1?'s':''}</span>
+      <span class="pt-chip ${pred.home_goals===m.homeScore&&pred.away_goals===m.awayScore?'hit':'miss'}">${pred.home_goals===m.homeScore&&pred.away_goals===m.awayScore?'✓':'✗'} Exact score</span>
+      <span class="pts-total" style="color:${pts===2?'var(--accent2)':pts>0?'var(--accent)':'var(--muted)'}">${pts} pt${pts!==1?'s':''}</span>
     </div>`;
   } else if (isFinished && !pred) {
     predResultHtml = `<div class="pred-result"><span class="no-pred">No prediction — 0 pts</span></div>`;
@@ -284,10 +283,6 @@ function renderMatchCard(m) {
         <input class="pred-input" type="number" min="0" max="20" id="ph-${m.id}" value="${predH}" placeholder="0" />
         <span class="pred-dash">–</span>
         <input class="pred-input" type="number" min="0" max="20" id="pa-${m.id}" value="${predA}" placeholder="0" />
-        <div class="ou-toggle">
-          <button class="ou-btn over ${predOU==='over'?'active over':''}" id="ou-o-${m.id}" onclick="toggleOU('${m.id}','over')">3+ ⬆</button>
-          <button class="ou-btn under ${predOU==='under'?'active under':''}" id="ou-u-${m.id}" onclick="toggleOU('${m.id}','under')">≤2 ⬇</button>
-        </div>
       </div>
       <button class="save-btn ${pred?'':''}${pred?'':''}​" id="sb-${m.id}" onclick="savePrediction('${m.id}')">
         ${pred ? '✏️ Update Prediction' : '💾 Save Prediction'}
@@ -327,17 +322,13 @@ window.toggleOU = (matchId, val) => {
 window.savePrediction = async (matchId) => {
   const hEl = document.getElementById(`ph-${matchId}`);
   const aEl = document.getElementById(`pa-${matchId}`);
-  const oBtn = document.getElementById(`ou-o-${matchId}`);
-  const uBtn = document.getElementById(`ou-u-${matchId}`);
   const saveBtn = document.getElementById(`sb-${matchId}`);
   const h = parseInt(hEl.value), a = parseInt(aEl.value);
-  const ou = oBtn.classList.contains('active') ? 'over' : uBtn.classList.contains('active') ? 'under' : null;
   if (isNaN(h) || isNaN(a) || h < 0 || a < 0) { alert('Enter valid scores'); return; }
-  if (!ou) { alert('Select over (3+ goals) or under (≤2 goals)'); return; }
   saveBtn.textContent = 'Saving…'; saveBtn.disabled = true;
   try {
-    await api('POST', '/api/predictions', { user_id: state.user.id, match_id: matchId, home_goals: h, away_goals: a, over_under: ou });
-    state.predictions[matchId] = { home_goals: h, away_goals: a, over_under: ou };
+    await api('POST', '/api/predictions', { user_id: state.user.id, match_id: matchId, home_goals: h, away_goals: a });
+    state.predictions[matchId] = { home_goals: h, away_goals: a };
     saveBtn.textContent = '✓ Saved!'; saveBtn.classList.add('saved');
     document.getElementById(`mc-${matchId}`)?.classList.add('has-pred');
     setTimeout(() => { if (saveBtn) { saveBtn.textContent = '✏️ Update Prediction'; saveBtn.classList.remove('saved'); saveBtn.disabled = false; } }, 1800);
@@ -399,7 +390,6 @@ function renderLeaderboard() {
       <div class="lb-total">${row.total}</div>
       <div class="lb-stat">${row.result}</div>
       <div class="lb-stat">${row.exact}</div>
-      <div class="lb-stat">${row.ou}</div>
     </div>`).join('');
 
   return `
@@ -414,13 +404,12 @@ function renderLeaderboard() {
     ${podiumHtml}
     ${board.length > 3 ? `
     <div class="lb-table">
-      <div class="lb-header"><div>#</div><div>Player</div><div>Pts</div><div>Result</div><div>Exact</div><div>O/U</div></div>
+      <div class="lb-header"><div>#</div><div>Player</div><div>Pts</div><div>Result</div><div>Exact</div></div>
       ${restRows}
     </div>` : ''}
     <div class="lb-scoring">
       <span>🎯 Correct result = 1pt</span>
       <span>✅ Exact score = 1pt</span>
-      <span>📊 Over/Under = 1pt</span>
     </div>`}`;
 }
 
@@ -456,7 +445,6 @@ function calcPoints(pred, match) {
   const ar = match.homeScore > match.awayScore ? 'H' : match.homeScore < match.awayScore ? 'A' : 'D';
   if (pr === ar) pts++;
   if (pred.home_goals === match.homeScore && pred.away_goals === match.awayScore) pts++;
-  if (pred.over_under === ((match.homeScore + match.awayScore) >= 3 ? 'over' : 'under')) pts++;
   return pts;
 }
 
