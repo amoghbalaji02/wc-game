@@ -4,6 +4,8 @@ const API_KEY = process.env.FOOTBALL_API_KEY || '';
 const BASE_URL = 'https://api.football-data.org/v4';
 const COMPETITION = 'WC';
 
+const ODDS_API_KEY = process.env.ODDS_API_KEY || '';
+
 async function fetchFromApi(path) {
   const fetch = (await import('node-fetch')).default;
   const res = await fetch(`${BASE_URL}${path}`, {
@@ -87,4 +89,42 @@ function calcPoints(prediction, match) {
   return points;
 }
 
-module.exports = { getMatches, calcPoints };
+async function getOdds() {
+  const cached = db.prepare(`SELECT data, updated_at FROM match_cache WHERE match_id = 'odds'`).get();
+  if (cached) {
+    const age = (Date.now() - new Date(cached.updated_at).getTime()) / 1000;
+    if (age < 3600) return JSON.parse(cached.data); // cache 1 hour — odds don't change that fast
+  }
+  if (!ODDS_API_KEY) return {};
+  try {
+    const fetch = (await import('node-fetch')).default;
+    const res = await fetch(
+      `https://api.the-odds-api.com/v4/sports/soccer_fifa_world_cup/odds/?apiKey=${ODDS_API_KEY}&regions=eu&markets=h2h&oddsFormat=decimal`
+    );
+    if (!res.ok) { console.error('Odds API error', res.status); return {}; }
+    const data = await res.json();
+    // Build a map keyed by "HomeTeam|AwayTeam" -> { home, draw, away }
+    const oddsMap = {};
+    for (const event of data) {
+      const bookmaker = event.bookmakers?.[0];
+      if (!bookmaker) continue;
+      const market = bookmaker.markets?.find(m => m.key === 'h2h');
+      if (!market) continue;
+      const outcomes = market.outcomes;
+      const home = outcomes.find(o => o.name === event.home_team)?.price;
+      const away = outcomes.find(o => o.name === event.away_team)?.price;
+      const draw = outcomes.find(o => o.name === 'Draw')?.price;
+      if (home && away) {
+        oddsMap[`${event.home_team}|${event.away_team}`] = { home, draw, away };
+      }
+    }
+    db.prepare(`INSERT OR REPLACE INTO match_cache (match_id, data, updated_at) VALUES ('odds', ?, CURRENT_TIMESTAMP)`)
+      .run(JSON.stringify(oddsMap));
+    return oddsMap;
+  } catch (e) {
+    console.error('Odds fetch failed:', e.message);
+    return {};
+  }
+}
+
+module.exports = { getMatches, getOdds, calcPoints };

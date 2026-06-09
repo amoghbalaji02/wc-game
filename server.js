@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const db = require('./db');
-const { getMatches, calcPoints } = require('./api');
+const { getMatches, getOdds, calcPoints } = require('./api');
 
 const app = express();
 app.use(express.json());
@@ -50,6 +50,13 @@ app.get('/api/matches', async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// ── Odds ───────────────────────────────────────────────────────────────────
+
+app.get('/api/odds', async (req, res) => {
+  try { res.json(await getOdds()); }
+  catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // ── Predictions ────────────────────────────────────────────────────────────

@@ -291,6 +291,23 @@ body::after {
 }
 .score-display .vs { font-size: 0.82rem; color: var(--muted); font-weight: 700; }
 
+/* ── Odds ── */
+.odds-row {
+  display: flex; gap: 6px; margin-bottom: 14px;
+}
+.odd-chip {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  padding: 8px 6px;
+  background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); transition: all 0.15s; gap: 2px;
+}
+.odd-chip.fav {
+  background: rgba(79,142,247,0.1); border-color: rgba(79,142,247,0.3);
+}
+.odd-label { font-size: 0.62rem; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+.odd-val { font-size: 0.95rem; font-weight: 800; color: var(--text); }
+.odd-chip.fav .odd-val { color: var(--accent); }
+
 /* ── Prediction inputs ── */
 .pred-section { border-top: 1px solid var(--border); padding-top: 14px; }
 .pred-label { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; margin-bottom: 10px; }

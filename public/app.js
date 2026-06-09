@@ -3,8 +3,9 @@
 const state = {
   user: null, room: null,
   matches: [], predictions: {},
-  leaderboard: [], tab: 'matches',
-  matchFilter: 'all', loadingMatches: true, loadingLeaderboard: false,
+  leaderboard: [], odds: {},
+  tab: 'matches', matchFilter: 'all',
+  loadingMatches: true, loadingLeaderboard: false,
 };
 
 function loadSession() {
@@ -256,6 +257,26 @@ function renderMatchCard(m) {
     predResultHtml = `<div class="pred-result"><span class="no-pred">No prediction — 0 pts</span></div>`;
   }
 
+  // Find odds by trying team name combinations
+  const oddsKey = Object.keys(state.odds).find(k => {
+    const [h, a] = k.split('|');
+    return (h.includes(m.homeTeam) || m.homeTeam.includes(h)) &&
+           (a.includes(m.awayTeam) || m.awayTeam.includes(a));
+  });
+  const matchOdds = oddsKey ? state.odds[oddsKey] : null;
+  const oddsHtml = (matchOdds && !locked) ? `
+    <div class="odds-row">
+      <div class="odd-chip home ${matchOdds.home < matchOdds.away && matchOdds.home < (matchOdds.draw||99) ? 'fav' : ''}">
+        <span class="odd-label">1</span><span class="odd-val">${matchOdds.home.toFixed(2)}</span>
+      </div>
+      ${matchOdds.draw ? `<div class="odd-chip draw ${matchOdds.draw < matchOdds.home && matchOdds.draw < matchOdds.away ? 'fav' : ''}">
+        <span class="odd-label">X</span><span class="odd-val">${matchOdds.draw.toFixed(2)}</span>
+      </div>` : ''}
+      <div class="odd-chip away ${matchOdds.away < matchOdds.home && matchOdds.away < (matchOdds.draw||99) ? 'fav' : ''}">
+        <span class="odd-label">2</span><span class="odd-val">${matchOdds.away.toFixed(2)}</span>
+      </div>
+    </div>` : '';
+
   const predSection = !locked ? `
     <div class="pred-section">
       <div class="pred-label">Your Prediction</div>
@@ -290,6 +311,7 @@ function renderMatchCard(m) {
         <div><div class="team-name">${escHtml(m.awayTeam)}</div><div class="team-code">${m.awayTeamCode||''}</div></div>
       </div>
     </div>
+    ${oddsHtml}
     ${predSection}
     ${predResultHtml}
   </div>`;
@@ -406,10 +428,15 @@ function renderLeaderboard() {
 
 async function loadData() {
   state.loadingMatches = true;
-  const [matches, preds] = await Promise.all([api('GET', '/api/matches'), api('GET', `/api/predictions/${state.user.id}`)]);
+  const [matches, preds, odds] = await Promise.all([
+    api('GET', '/api/matches'),
+    api('GET', `/api/predictions/${state.user.id}`),
+    api('GET', '/api/odds').catch(() => ({})),
+  ]);
   state.matches = matches;
   state.predictions = {};
   for (const p of preds) state.predictions[p.match_id] = p;
+  state.odds = odds;
   state.loadingMatches = false;
 }
 
